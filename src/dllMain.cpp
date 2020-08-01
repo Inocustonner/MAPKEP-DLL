@@ -1,13 +1,34 @@
-#include "dllInjLib/dllInj.h"
 #include <Windows.h>
+
+#include <ios>					// for create console
+#include <cstdio>				// for create console
 
 #define CAVE void __declspec(naked)
 
 int res;
 HANDLE proc = GetCurrentProcess();
-DWORD base = (DWORD)GetExeModule(proc);
-
+//DWORD base = (DWORD)GetExeModule(proc); // doesnt' work on winXP
+DWORD base = 0x400000; // let's assume that it is always this num
 DWORD sndFunc = base + 0x076C4;
+
+bool CreateConsole()
+{
+    if (AllocConsole())
+    {
+        FILE* conin, * conout;
+        freopen_s(&conin, "conin$", "r", stdin);
+        freopen_s(&conout, "conout$", "w", stdout);
+        freopen_s(&conout, "conout$", "w", stderr);
+
+        std::ios::sync_with_stdio();
+
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
 
 CAVE onButton()
 {
@@ -67,14 +88,14 @@ void *funcAddr = onButton;
 void __declspec(dllexport) create_cave()
 {
   int argc;
-	wchar_t **argv = reinterpret_cast<wchar_t**>(CommandLineToArgvW(GetCommandLineW(), &argc));
+  wchar_t **argv = reinterpret_cast<wchar_t**>(CommandLineToArgvW(GetCommandLineW(), &argc));
 
   const wchar_t *debug_flag = L"-debugDll";
   bool debug = false;
 
   for (int i = 0; i < argc; ++i)
   {
-    if (wcscmp(argv[i], debug_flag))
+    if (wcscmp(argv[i], debug_flag) == 0)
     {
       debug = true;
       break;
@@ -99,7 +120,7 @@ void __declspec(dllexport) create_cave()
             jmp_addr[4],
             jmp_addr[5]);
   }
-  WriteBytesArr(proc, 0x0000AEC4, jmp_addr, sizeof jmp_addr);
+  WriteProcessMemory(proc, (void*)(base + 0x0000AEC4), jmp_addr, sizeof jmp_addr, NULL);
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule,
